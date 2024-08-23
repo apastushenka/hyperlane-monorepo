@@ -4188,6 +4188,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyperlane-atleta"
+version = "0.1.0"
+dependencies = [
+ "abigen",
+ "async-trait",
+ "derive-new",
+ "ethers",
+ "ethers-contract",
+ "ethers-core",
+ "ethers-prometheus",
+ "ethers-signers",
+ "eyre",
+ "futures-util",
+ "hex 0.4.3",
+ "hyperlane-core",
+ "hyperlane-ethereum",
+ "itertools 0.10.5",
+ "num 0.4.1",
+ "num-traits",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+ "url",
+]
+
+[[package]]
 name = "hyperlane-base"
 version = "0.1.0"
 dependencies = [
@@ -4210,6 +4240,7 @@ dependencies = [
  "fuels",
  "futures",
  "futures-util",
+ "hyperlane-atleta",
  "hyperlane-core",
  "hyperlane-cosmos",
  "hyperlane-ethereum",

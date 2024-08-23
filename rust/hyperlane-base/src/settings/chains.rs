@@ -6,6 +6,7 @@ use std::{collections::HashMap, sync::Arc};
 use eyre::{eyre, Context, Result};
 
 use ethers_prometheus::middleware::{ChainInfo, ContractInfo, PrometheusMiddlewareConf};
+use hyperlane_atleta as h_atleta;
 use hyperlane_core::{
     config::OperationBatchConfig, AggregationIsm, CcipReadIsm, ContractLocator, HyperlaneAbi,
     HyperlaneDomain, HyperlaneDomainProtocol, HyperlaneMessage, HyperlaneProvider, IndexMode,
@@ -203,6 +204,10 @@ impl ChainConf {
         let locator = self.locator(self.addresses.mailbox);
 
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(conf, &locator, metrics, h_atleta::MailboxBuilder {})
+                    .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(conf, &locator, metrics, h_eth::MailboxBuilder {})
                     .await
@@ -238,6 +243,10 @@ impl ChainConf {
         let locator = self.locator(self.addresses.merkle_tree_hook);
 
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(conf, &locator, metrics, h_atleta::MerkleTreeHookBuilder {})
+                    .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(conf, &locator, metrics, h_eth::MerkleTreeHookBuilder {})
                     .await
@@ -270,6 +279,17 @@ impl ChainConf {
         let locator = self.locator(self.addresses.mailbox);
 
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(
+                    conf,
+                    &locator,
+                    metrics,
+                    h_atleta::SequenceIndexerBuilder {
+                        reorg_period: self.reorg_period,
+                    },
+                )
+                .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(
                     conf,
@@ -309,6 +329,17 @@ impl ChainConf {
         let locator = self.locator(self.addresses.mailbox);
 
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(
+                    conf,
+                    &locator,
+                    metrics,
+                    h_atleta::DeliveryIndexerBuilder {
+                        reorg_period: self.reorg_period,
+                    },
+                )
+                .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(
                     conf,
@@ -349,6 +380,15 @@ impl ChainConf {
         let locator = self.locator(self.addresses.interchain_gas_paymaster);
 
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(
+                    conf,
+                    &locator,
+                    metrics,
+                    h_atleta::InterchainGasPaymasterBuilder {},
+                )
+                .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(
                     conf,
@@ -387,6 +427,18 @@ impl ChainConf {
         let locator = self.locator(self.addresses.interchain_gas_paymaster);
 
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(
+                    conf,
+                    &locator,
+                    metrics,
+                    h_atleta::InterchainGasPaymasterIndexerBuilder {
+                        mailbox_address: self.addresses.mailbox.into(),
+                        reorg_period: self.reorg_period,
+                    },
+                )
+                .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(
                     conf,
@@ -427,6 +479,17 @@ impl ChainConf {
         let locator = self.locator(self.addresses.merkle_tree_hook);
 
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(
+                    conf,
+                    &locator,
+                    metrics,
+                    h_atleta::MerkleTreeHookIndexerBuilder {
+                        reorg_period: self.reorg_period,
+                    },
+                )
+                .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(
                     conf,
@@ -470,6 +533,15 @@ impl ChainConf {
         let ctx = "Building validator announce";
         let locator = self.locator(self.addresses.validator_announce);
         match &self.connection {
+            ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
+                self.build_ethereum(
+                    conf,
+                    &locator,
+                    metrics,
+                    h_atleta::ValidatorAnnounceBuilder {},
+                )
+                .await
+            }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(conf, &locator, metrics, h_eth::ValidatorAnnounceBuilder {})
                     .await

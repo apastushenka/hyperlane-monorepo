@@ -218,6 +218,7 @@ impl HyperlaneDomainProtocol {
 )]
 pub enum HyperlaneDomainTechnicalStack {
     ArbitrumNitro,
+    Atleta,
     #[default]
     Other,
 }
@@ -474,6 +475,13 @@ impl HyperlaneDomain {
         matches!(
             self.domain_technical_stack(),
             HyperlaneDomainTechnicalStack::ArbitrumNitro
+        )
+    }
+
+    pub const fn is_atleta(&self) -> bool {
+        matches!(
+            self.domain_technical_stack(),
+            HyperlaneDomainTechnicalStack::Atleta
         )
     }
 

@@ -18,6 +18,7 @@ use hyperlane_ethereum::{BuildableWithProvider, ConnectionConf, EthereumProvider
 use crate::interfaces::merkle_tree_hook::{
     InsertedIntoTreeFilter, MerkleTreeHook as MerkleTreeHookContract, Tree,
 };
+use crate::middleware_ext::{MiddlewareExt, BLOCK_ERROR_MSG};
 use crate::tx::call_with_lag;
 
 use super::utils::fetch_raw_logs_and_log_meta;
@@ -56,9 +57,7 @@ impl BuildableWithProvider for MerkleTreeHookBuilder {
     }
 }
 
-pub struct MerkleTreeHookIndexerBuilder {
-    pub reorg_period: u32,
-}
+pub struct MerkleTreeHookIndexerBuilder {}
 
 #[async_trait]
 impl BuildableWithProvider for MerkleTreeHookIndexerBuilder {
@@ -74,7 +73,6 @@ impl BuildableWithProvider for MerkleTreeHookIndexerBuilder {
         Box::new(EthereumMerkleTreeHookIndexer::new(
             Arc::new(provider),
             locator,
-            self.reorg_period,
         ))
     }
 }
@@ -87,7 +85,6 @@ where
 {
     contract: Arc<MerkleTreeHookContract<M>>,
     provider: Arc<M>,
-    reorg_period: u32,
 }
 
 impl<M> EthereumMerkleTreeHookIndexer<M>
@@ -95,14 +92,13 @@ where
     M: Middleware + 'static,
 {
     /// Create new EthereumMerkleTreeHookIndexer
-    pub fn new(provider: Arc<M>, locator: &ContractLocator, reorg_period: u32) -> Self {
+    pub fn new(provider: Arc<M>, locator: &ContractLocator) -> Self {
         Self {
             contract: Arc::new(MerkleTreeHookContract::new(
                 locator.address,
                 provider.clone(),
             )),
             provider,
-            reorg_period,
         }
     }
 }
@@ -142,11 +138,11 @@ where
     async fn get_finalized_block_number(&self) -> ChainResult<u32> {
         Ok(self
             .provider
-            .get_block_number()
+            .get_finalized_block_number()
             .await
             .map_err(ChainCommunicationError::from_other)?
-            .as_u32()
-            .saturating_sub(self.reorg_period))
+            .ok_or(ChainCommunicationError::CustomError(BLOCK_ERROR_MSG.into()))?
+            .as_u32())
     }
 
     async fn fetch_logs_by_tx_hash(

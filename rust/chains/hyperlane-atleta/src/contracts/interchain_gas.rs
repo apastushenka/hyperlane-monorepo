@@ -15,11 +15,13 @@ use hyperlane_core::{
 use hyperlane_ethereum::{BuildableWithProvider, ConnectionConf, EthereumProvider};
 use tracing::instrument;
 
-use super::utils::fetch_raw_logs_and_log_meta;
 use crate::interfaces::i_interchain_gas_paymaster::{
     GasPaymentFilter, IInterchainGasPaymaster as EthereumInterchainGasPaymasterInternal,
     IINTERCHAINGASPAYMASTER_ABI,
 };
+use crate::middleware_ext::{MiddlewareExt, BLOCK_ERROR_MSG};
+
+use super::utils::fetch_raw_logs_and_log_meta;
 
 impl<M> Display for EthereumInterchainGasPaymasterInternal<M>
 where
@@ -32,7 +34,6 @@ where
 
 pub struct InterchainGasPaymasterIndexerBuilder {
     pub mailbox_address: H160,
-    pub reorg_period: u32,
 }
 
 #[async_trait]
@@ -49,7 +50,6 @@ impl BuildableWithProvider for InterchainGasPaymasterIndexerBuilder {
         Box::new(EthereumInterchainGasPaymasterIndexer::new(
             Arc::new(provider),
             locator,
-            self.reorg_period,
         ))
     }
 }
@@ -62,7 +62,6 @@ where
 {
     contract: Arc<EthereumInterchainGasPaymasterInternal<M>>,
     provider: Arc<M>,
-    reorg_period: u32,
 }
 
 impl<M> EthereumInterchainGasPaymasterIndexer<M>
@@ -70,14 +69,13 @@ where
     M: Middleware + 'static,
 {
     /// Create new EthereumInterchainGasPaymasterIndexer
-    pub fn new(provider: Arc<M>, locator: &ContractLocator, reorg_period: u32) -> Self {
+    pub fn new(provider: Arc<M>, locator: &ContractLocator) -> Self {
         Self {
             contract: Arc::new(EthereumInterchainGasPaymasterInternal::new(
                 locator.address,
                 provider.clone(),
             )),
             provider,
-            reorg_period,
         }
     }
 }
@@ -121,11 +119,11 @@ where
     async fn get_finalized_block_number(&self) -> ChainResult<u32> {
         Ok(self
             .provider
-            .get_block_number()
+            .get_finalized_block_number()
             .await
             .map_err(ChainCommunicationError::from_other)?
-            .as_u32()
-            .saturating_sub(self.reorg_period))
+            .ok_or(ChainCommunicationError::CustomError(BLOCK_ERROR_MSG.into()))?
+            .as_u32())
     }
 
     async fn fetch_logs_by_tx_hash(

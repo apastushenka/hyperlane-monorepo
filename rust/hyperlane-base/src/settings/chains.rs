@@ -280,15 +280,8 @@ impl ChainConf {
 
         match &self.connection {
             ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
-                self.build_ethereum(
-                    conf,
-                    &locator,
-                    metrics,
-                    h_atleta::SequenceIndexerBuilder {
-                        reorg_period: self.reorg_period,
-                    },
-                )
-                .await
+                self.build_ethereum(conf, &locator, metrics, h_atleta::SequenceIndexerBuilder {})
+                    .await
             }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(
@@ -330,15 +323,8 @@ impl ChainConf {
 
         match &self.connection {
             ChainConnectionConf::Ethereum(conf) if self.domain.is_atleta() => {
-                self.build_ethereum(
-                    conf,
-                    &locator,
-                    metrics,
-                    h_atleta::DeliveryIndexerBuilder {
-                        reorg_period: self.reorg_period,
-                    },
-                )
-                .await
+                self.build_ethereum(conf, &locator, metrics, h_atleta::DeliveryIndexerBuilder {})
+                    .await
             }
             ChainConnectionConf::Ethereum(conf) => {
                 self.build_ethereum(
@@ -434,7 +420,6 @@ impl ChainConf {
                     metrics,
                     h_atleta::InterchainGasPaymasterIndexerBuilder {
                         mailbox_address: self.addresses.mailbox.into(),
-                        reorg_period: self.reorg_period,
                     },
                 )
                 .await
@@ -484,9 +469,7 @@ impl ChainConf {
                     conf,
                     &locator,
                     metrics,
-                    h_atleta::MerkleTreeHookIndexerBuilder {
-                        reorg_period: self.reorg_period,
-                    },
+                    h_atleta::MerkleTreeHookIndexerBuilder {},
                 )
                 .await
             }

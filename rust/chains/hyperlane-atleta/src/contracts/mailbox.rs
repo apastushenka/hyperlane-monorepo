@@ -33,6 +33,7 @@ use crate::interfaces::i_mailbox::{
     IMailbox as EthereumMailboxInternal, ProcessCall, IMAILBOX_ABI,
 };
 use crate::interfaces::mailbox::DispatchFilter;
+use crate::middleware_ext::{MiddlewareExt, BLOCK_ERROR_MSG};
 use crate::tx::{call_with_lag, fill_tx_gas_params, report_tx};
 
 use super::multicall::{self, build_multicall};
@@ -47,9 +48,7 @@ where
     }
 }
 
-pub struct SequenceIndexerBuilder {
-    pub reorg_period: u32,
-}
+pub struct SequenceIndexerBuilder {}
 
 #[async_trait]
 impl BuildableWithProvider for SequenceIndexerBuilder {
@@ -62,17 +61,11 @@ impl BuildableWithProvider for SequenceIndexerBuilder {
         _conn: &ConnectionConf,
         locator: &ContractLocator,
     ) -> Self::Output {
-        Box::new(EthereumMailboxIndexer::new(
-            Arc::new(provider),
-            locator,
-            self.reorg_period,
-        ))
+        Box::new(EthereumMailboxIndexer::new(Arc::new(provider), locator))
     }
 }
 
-pub struct DeliveryIndexerBuilder {
-    pub reorg_period: u32,
-}
+pub struct DeliveryIndexerBuilder {}
 
 #[async_trait]
 impl BuildableWithProvider for DeliveryIndexerBuilder {
@@ -85,11 +78,7 @@ impl BuildableWithProvider for DeliveryIndexerBuilder {
         _conn: &ConnectionConf,
         locator: &ContractLocator,
     ) -> Self::Output {
-        Box::new(EthereumMailboxIndexer::new(
-            Arc::new(provider),
-            locator,
-            self.reorg_period,
-        ))
+        Box::new(EthereumMailboxIndexer::new(Arc::new(provider), locator))
     }
 }
 
@@ -101,7 +90,6 @@ where
 {
     contract: Arc<EthereumMailboxInternal<M>>,
     provider: Arc<M>,
-    reorg_period: u32,
 }
 
 impl<M> EthereumMailboxIndexer<M>
@@ -109,27 +97,23 @@ where
     M: Middleware + 'static,
 {
     /// Create new EthereumMailboxIndexer
-    pub fn new(provider: Arc<M>, locator: &ContractLocator, reorg_period: u32) -> Self {
+    pub fn new(provider: Arc<M>, locator: &ContractLocator) -> Self {
         let contract = Arc::new(EthereumMailboxInternal::new(
             locator.address,
             provider.clone(),
         ));
-        Self {
-            contract,
-            provider,
-            reorg_period,
-        }
+        Self { contract, provider }
     }
 
     #[instrument(level = "debug", err, ret, skip(self))]
     async fn get_finalized_block_number(&self) -> ChainResult<u32> {
         Ok(self
             .provider
-            .get_block_number()
+            .get_finalized_block_number()
             .await
             .map_err(ChainCommunicationError::from_other)?
-            .as_u32()
-            .saturating_sub(self.reorg_period))
+            .ok_or(ChainCommunicationError::CustomError(BLOCK_ERROR_MSG.into()))?
+            .as_u32())
     }
 }
 

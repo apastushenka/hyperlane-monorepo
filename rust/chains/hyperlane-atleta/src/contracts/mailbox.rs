@@ -12,6 +12,7 @@ use ethers::abi::{AbiEncode, Detokenize};
 use ethers::prelude::Middleware;
 use ethers_contract::builders::ContractCall;
 use ethers_contract::{Multicall, MulticallResult};
+use ethers_core::types::BlockNumber;
 use futures_util::future::join_all;
 use hyperlane_core::{BatchResult, QueueOperation, H512};
 use itertools::Itertools;
@@ -34,7 +35,7 @@ use crate::interfaces::i_mailbox::{
 };
 use crate::interfaces::mailbox::DispatchFilter;
 use crate::middleware_ext::{MiddlewareExt, BLOCK_ERROR_MSG};
-use crate::tx::{call_with_lag, ensure_block_finalized, fill_tx_gas_params, report_tx};
+use crate::tx::{ensure_block_finalized, fill_tx_gas_params, report_tx};
 
 use super::multicall::{self, build_multicall};
 use super::utils::fetch_raw_logs_and_log_meta;
@@ -445,8 +446,8 @@ where
     M: Middleware + 'static,
 {
     #[instrument(skip(self))]
-    async fn count(&self, maybe_lag: Option<NonZeroU64>) -> ChainResult<u32> {
-        let call = call_with_lag(self.contract.nonce(), &self.provider, maybe_lag).await?;
+    async fn count(&self, _maybe_lag: Option<NonZeroU64>) -> ChainResult<u32> {
+        let call = self.contract.nonce().block(BlockNumber::Finalized);
         let nonce = call.call().await?;
         Ok(nonce)
     }

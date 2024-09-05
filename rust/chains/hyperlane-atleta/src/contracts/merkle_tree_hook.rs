@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use ethers::prelude::Middleware;
+use ethers_core::types::BlockNumber;
 use hyperlane_core::accumulator::incremental::IncrementalMerkle;
 use tracing::instrument;
 
@@ -19,7 +20,6 @@ use crate::interfaces::merkle_tree_hook::{
     InsertedIntoTreeFilter, MerkleTreeHook as MerkleTreeHookContract, Tree,
 };
 use crate::middleware_ext::{MiddlewareExt, BLOCK_ERROR_MSG};
-use crate::tx::call_with_lag;
 
 use super::utils::fetch_raw_logs_and_log_meta;
 
@@ -242,9 +242,11 @@ where
     M: Middleware + 'static,
 {
     #[instrument(skip(self))]
-    async fn latest_checkpoint(&self, maybe_lag: Option<NonZeroU64>) -> ChainResult<Checkpoint> {
-        let call =
-            call_with_lag(self.contract.latest_checkpoint(), &self.provider, maybe_lag).await?;
+    async fn latest_checkpoint(&self, _maybe_lag: Option<NonZeroU64>) -> ChainResult<Checkpoint> {
+        let call = self
+            .contract
+            .latest_checkpoint()
+            .block(BlockNumber::Finalized);
 
         let (root, index) = call.call().await?;
         Ok(Checkpoint {
@@ -257,15 +259,15 @@ where
 
     #[instrument(skip(self))]
     #[allow(clippy::needless_range_loop)]
-    async fn tree(&self, maybe_lag: Option<NonZeroU64>) -> ChainResult<IncrementalMerkle> {
-        let call = call_with_lag(self.contract.tree(), &self.provider, maybe_lag).await?;
+    async fn tree(&self, _maybe_lag: Option<NonZeroU64>) -> ChainResult<IncrementalMerkle> {
+        let call = self.contract.tree().block(BlockNumber::Finalized);
 
         Ok(call.call().await?.into())
     }
 
     #[instrument(skip(self))]
-    async fn count(&self, maybe_lag: Option<NonZeroU64>) -> ChainResult<u32> {
-        let call = call_with_lag(self.contract.count(), &self.provider, maybe_lag).await?;
+    async fn count(&self, _maybe_lag: Option<NonZeroU64>) -> ChainResult<u32> {
+        let call = self.contract.count().block(BlockNumber::Finalized);
         let count = call.call().await?;
         Ok(count)
     }

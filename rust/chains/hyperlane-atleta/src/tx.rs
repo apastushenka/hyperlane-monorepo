@@ -1,4 +1,3 @@
-use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -246,26 +245,4 @@ where
     };
 
     Ok((base_fee_per_gas, max_fee_per_gas, max_priority_fee_per_gas))
-}
-
-pub(crate) async fn call_with_lag<M, T>(
-    call: ethers::contract::builders::ContractCall<M, T>,
-    provider: &M,
-    maybe_lag: Option<NonZeroU64>,
-) -> ChainResult<ethers::contract::builders::ContractCall<M, T>>
-where
-    M: Middleware + 'static,
-    T: Detokenize,
-{
-    if let Some(lag) = maybe_lag {
-        let fixed_block_number: BlockNumber = provider
-            .get_block_number()
-            .await
-            .map_err(ChainCommunicationError::from_other)?
-            .saturating_sub(lag.get().into())
-            .into();
-        Ok(call.block(fixed_block_number))
-    } else {
-        Ok(call)
-    }
 }

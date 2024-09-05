@@ -34,7 +34,7 @@ use crate::interfaces::i_mailbox::{
 };
 use crate::interfaces::mailbox::DispatchFilter;
 use crate::middleware_ext::{MiddlewareExt, BLOCK_ERROR_MSG};
-use crate::tx::{call_with_lag, fill_tx_gas_params, report_tx};
+use crate::tx::{call_with_lag, ensure_block_finalized, fill_tx_gas_params, report_tx};
 
 use super::multicall::{self, build_multicall};
 use super::utils::fetch_raw_logs_and_log_meta;
@@ -401,9 +401,15 @@ pub struct SubmittableBatch<M> {
 
 impl<M: Middleware + 'static> SubmittableBatch<M> {
     pub async fn submit(self) -> ChainResult<TxOutcome> {
-        let call_with_gas_overrides =
-            fill_tx_gas_params(self.call, self.provider, &self.transaction_overrides).await?;
+        let call_with_gas_overrides = fill_tx_gas_params(
+            self.call,
+            self.provider.clone(),
+            &self.transaction_overrides,
+        )
+        .await?;
         let outcome = report_tx(call_with_gas_overrides).await?;
+        ensure_block_finalized(self.provider, outcome.block_number.unwrap()).await?;
+
         Ok(outcome.into())
     }
 }
@@ -476,6 +482,8 @@ where
             .process_contract_call(message, metadata, tx_gas_limit)
             .await?;
         let receipt = report_tx(contract_call).await?;
+        ensure_block_finalized(self.provider.clone(), receipt.block_number.unwrap()).await?;
+
         Ok(receipt.into())
     }
 

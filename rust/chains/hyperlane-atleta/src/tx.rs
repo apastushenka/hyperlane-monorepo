@@ -10,7 +10,7 @@ use ethers::{
 };
 use ethers_contract::builders::ContractCall;
 use ethers_core::{
-    types::{BlockNumber, U256 as EthersU256},
+    types::{BlockNumber, U256 as EthersU256, U64},
     utils::{
         eip1559_default_estimator, EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
         EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE,
@@ -20,6 +20,7 @@ use hyperlane_core::{utils::bytes_to_hex, ChainCommunicationError, ChainResult, 
 use hyperlane_ethereum::TransactionOverrides;
 use tracing::{debug, error, info};
 
+use crate::middleware_ext::{MiddlewareExt, BLOCK_ERROR_MSG};
 use crate::Middleware;
 
 /// An amount of gas to add to the estimated gas
@@ -29,6 +30,8 @@ pub fn apply_gas_estimate_buffer(gas: U256) -> U256 {
     gas.saturating_add(GAS_ESTIMATE_BUFFER.into())
 }
 
+const BLOCK_FINALIZATION_TIMEOUT: Duration = Duration::from_secs(240);
+const BLOCK_POLLING_INTERVAL: Duration = Duration::from_secs(6);
 const PENDING_TRANSACTION_POLLING_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Dispatches a transaction, logs the tx id, and returns the result
@@ -83,6 +86,50 @@ pub(crate) async fn track_pending_tx<P: JsonRpcClient>(
         Err(x) => {
             error!(?tx_hash, error = ?x, "waiting for receipt timed out");
             Err(ChainCommunicationError::TransactionTimeout())
+        }
+    }
+}
+
+pub(crate) async fn ensure_block_finalized<M>(
+    provider: Arc<M>,
+    block_number: U64,
+) -> ChainResult<()>
+where
+    M: Middleware + 'static,
+{
+    let wait_finalization = async move {
+        let mut interval = tokio::time::interval(BLOCK_POLLING_INTERVAL);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        loop {
+            interval.tick().await;
+
+            let finalized = provider
+                .get_finalized_block_number()
+                .await
+                .map_err(ChainCommunicationError::from_other)?
+                .ok_or(ChainCommunicationError::CustomError(BLOCK_ERROR_MSG.into()))?;
+
+            if finalized >= block_number {
+                return Result::<(), ChainCommunicationError>::Ok(());
+            }
+        }
+    };
+
+    match tokio::time::timeout(BLOCK_FINALIZATION_TIMEOUT, wait_finalization).await {
+        Ok(Ok(())) => {
+            info!(?block_number, "finalized block");
+            Ok(())
+        }
+        Ok(Err(x)) => {
+            error!(?block_number, error = ?x, "encountered error when waiting for finalization");
+            Err(x)
+        }
+        Err(x) => {
+            error!(?block_number, error = ?x, "waiting for finalization timed out");
+            Err(ChainCommunicationError::CustomError(
+                "Block finalization timed out".into(),
+            ))
         }
     }
 }

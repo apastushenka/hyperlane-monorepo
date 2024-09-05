@@ -17,7 +17,7 @@ use crate::{
     interfaces::i_validator_announce::{
         IValidatorAnnounce as EthereumValidatorAnnounceInternal, IVALIDATORANNOUNCE_ABI,
     },
-    tx::{fill_tx_gas_params, report_tx},
+    tx::{ensure_block_finalized, fill_tx_gas_params, report_tx},
 };
 
 impl<M> std::fmt::Display for EthereumValidatorAnnounceInternal<M>
@@ -166,6 +166,8 @@ where
     async fn announce(&self, announcement: SignedType<Announcement>) -> ChainResult<TxOutcome> {
         let contract_call = self.announce_contract_call(announcement).await?;
         let receipt = report_tx(contract_call).await?;
+        ensure_block_finalized(self.provider.clone(), receipt.block_number.unwrap()).await?;
+
         Ok(receipt.into())
     }
 }
